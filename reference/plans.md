@@ -15,19 +15,21 @@ A Plan belongs to a BasePlan and works as a price version for it. The Plan retri
 |---|---|---|---|---|
 | `id` | integer | `true` | Read | - |
 | `object` | string | - | Read | Resource type |
-| `amount` | float | `true` | Write (only create) | Also accepts integers |
+| `amount` | float | `true` on create | Write | Also accepts integers. **On update:** rejected if any subscription already uses this plan (any status except `unselected`). |
 | `base_plan` | BasePlan | - | Read | Parent BasePlan resource |
 | `created_at` | datetime | - | Read | - |
 | `currency` | string | - | Read | - |
-| `main_discount_type` | string | `true` | Write (only create) | Valid values: `amount`, `percentage`, `none` |
-| `main_discount_amount` | integer | `true` if `main_discount_type` is not `none` | Write (only create) | - |
 | `metadata` | json | - | Write | - |
-| `per_unit_price` | integer | - | Read | - |
-| `per_unit_price_description` | string | - | Read | - |
-| `per_unit_quantities_configuration` | json | - | Read | Minimum, maximum and step values for valid per unit quantities |
-| `start_at` | datetime | - | Write (only create) | The date from which the plan's price will be effective |
-| `setup_fee` | float | - | Write (only create) | Also accepts integers |
-| `setup_fee_description` | string | - | Write (only create) | - |
+| `per_unit_price` | integer | - | Write | **On update:** rejected if any subscription already uses this plan (any status except `unselected`). |
+| `per_unit_price_description` | string | - | Write | - |
+| `per_unit_quantities_configuration` | json | - | Read | Object with `min`, `max`, and `step` (see the three fields below). Returned on read; on **create** you can send either this object under `plan` or the separate `_min` / `_max` / `_step` attributes. |
+| `per_unit_quantities_configuration_min` | float | - | Write | For per-unit (non-metered) base plans: minimum quantity the customer can choose at checkout. |
+| `per_unit_quantities_configuration_max` | float | - | Write | For per-unit (non-metered) base plans: maximum quantity the customer can choose at checkout. |
+| `per_unit_quantities_configuration_step` | float | - | Write | For per-unit (non-metered) base plans: increment between allowed quantities (e.g. `1` allows 1, 2, 3, …). |
+| `start_at` | datetime | - | Write | The date from which the plan's price will be effective. Must be unique per BasePlan. |
+| `setup_fee` | float | - | Write | Also accepts integers |
+| `setup_fee_description` | string | - | Write | - |
+| `store_discount` | integer | - | Write | 0–100 |
 | `updated_at` | datetime | - | Read | - |
 
 ## Endpoints
@@ -115,8 +117,6 @@ curl -s https://<subdomain>.boxful.io/api/v1/plans/1 \
   },
   "created_at": "2020-03-25T13:05:14.723-03:00",
   "currency": "ARS",
-  "main_discount_type": "amount",
-  "main_discount_amount": 0,
   "metadata": null,
   "per_unit_price": null,
   "per_unit_price_description": null,
@@ -140,8 +140,6 @@ curl -s -X POST https://<subdomain>.boxful.io/api/v1/base_plans/1/plans \
   -H "Content-Type: application/json" \
   -d '{
     "amount": 100.0,
-    "main_discount_type": "amount",
-    "main_discount_amount": 0,
     "start_at": "2020-03-25T13:05:14.699-03:00"
   }'
 ```
@@ -154,7 +152,11 @@ Returns the created Plan resource with its `base_plan`.
 
 - `PATCH /api/v1/plans/{plan_id}`
 
-###### Example request
+You may send any writable field from the [fields](#fields) table: for example `amount`, `store_discount`, `start_at`, `setup_fee`, `setup_fee_description`, `per_unit_price`, `per_unit_price_description`, `per_unit_quantities_configuration` (with nested `min`, `max`, `step`) or `per_unit_quantities_configuration_min`, `per_unit_quantities_configuration_max`, `per_unit_quantities_configuration_step`, and `metadata`. Standard validations apply (for example `start_at` must remain unique per base plan).
+
+**Plans in use:** if at least one subscription uses this plan (any status except `unselected`), **`amount`** and **`per_unit_price`** cannot be updated; the API responds with `422`. To introduce a new price for new or migrating customers, create a new plan version with `POST /api/v1/base_plans/{base_plan_id}/plans` and a distinct `start_at`.
+
+###### Example request (metadata)
 
 ```shell
 curl -s -X PATCH https://<subdomain>.boxful.io/api/v1/plans/1 \
@@ -163,6 +165,25 @@ curl -s -X PATCH https://<subdomain>.boxful.io/api/v1/plans/1 \
   -d '{ "metadata": { "our_id": 4567 } }'
 ```
 
+###### Example request (several fields under `plan`)
+
+```shell
+curl -s -X PATCH https://<subdomain>.boxful.io/api/v1/plans/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "plan": {
+      "start_at": "2026-05-01T00:00:00.000-03:00",
+      "setup_fee": 0,
+      "metadata": { "our_id": 4567 }
+    }
+  }'
+```
+
 ###### Example response
 
-Returns the updated Plan resource.
+Returns the updated Plan resource (same shape as [Get a plan](#get-a-plan)).
+
+###### Error responses
+
+- `422 Unprocessable Entity` — validation failed (e.g. locked `amount` / `per_unit_price`, invalid `start_at`, or other model errors). Body includes an `errors` array of messages.

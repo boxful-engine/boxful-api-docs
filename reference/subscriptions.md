@@ -31,10 +31,10 @@ Subscriptions are created during the checkout process. Therefore, editable field
 | `last_invoice` | json | - | Read | Last Invoice resource |
 | `next_invoice` | json | - | Read | Next Invoice resource |
 | `metadata` | json | - | Write (only update) | - |
-| `payment_type` | string | `true` | Write (only update) | Valid values: `cbu`, `credit_card`, `credit_card_batch`, `individual_payment` |
+| `payment_type` | string | `true` | Write (only update) | Valid values: `cbu`, `credit_card`, `individual_payment` |
 | `plan_id` | integer | `true` | Write (only update) | - |
 | `plan_quantity` | integer | - | Write (only update) | - |
-| `status` | string | `true` | Write (only update) | Valid values: `authorized`, `paused`, `cancelled`, `completed` |
+| `status` | string | `true` | Write (only update) | Valid values: `authorized`, `in_trial`, `paused`, `cancelled`, `completed` |
 | `trial_end` | date | - | Read | Date of free-trial end |
 | `trial_start` | date | - | Read | Date of free-trial start |
 | `updated_at` | datetime | - | Read | - |
@@ -43,6 +43,7 @@ Subscriptions are created during the checkout process. Therefore, editable field
 | `customer_email` | string | - | Read | Customer's email |
 | `customer_external_reference` | string | - | Read | Customer's external reference |
 | `debit_date` | json | - | Read | Associated DebitDate resource (if configured) |
+| `external_reference` | string | - | Read | Can be used as an identifier with `?identifier=external_reference` on Get and Update endpoints |
 
 ## Endpoints
 
@@ -60,6 +61,10 @@ Subscriptions are created during the checkout process. Therefore, editable field
 | Field | Valid operators | Valid filter values |
 |---|---|---|
 | `status` | `is`, `is_not` | Subscription statuses |
+| `customer_id` | `is` | customer.id (integer) |
+| `customer_external_reference` | `is` | customer.external_reference (string) |
+
+Both `customer_id` and `customer_external_reference` filter subscriptions by their associated customer.
 
 ###### Example request
 
@@ -71,6 +76,12 @@ curl -s https://<subdomain>.boxful.io/api/v1/subscriptions \
 ### Get a subscription
 
 - `GET /api/v1/subscriptions/{subscription_id}`
+
+**Alternative identification**: Instead of using the `subscription_id`, the `external_reference` can be used as a parameter. To do so it must be specified in the query string that the `external_reference` is being used as an identifier.
+
+For a Subscription with `id` `14039` and `external_reference` `sub-ext-123` these options are equivalent:
+- `GET /api/v1/subscriptions/14039`
+- `GET /api/v1/subscriptions/sub-ext-123?identifier=external_reference`
 
 ###### Example request
 
@@ -158,7 +169,8 @@ curl -s https://<subdomain>.boxful.io/api/v1/subscriptions/1 \
   "status": "authorized",
   "trial_end": null,
   "trial_start": null,
-  "updated_at": "2021-03-29T13:43:32.158-03:00"
+  "updated_at": "2021-03-29T13:43:32.158-03:00",
+  "external_reference": "sub-ext-123"
 }
 ```
 
@@ -189,6 +201,8 @@ curl -s -X POST https://<subdomain>.boxful.io/api/v1/subscriptions \
 ### Update a subscription
 
 - `PATCH /api/v1/subscriptions/{subscription_id}`
+
+**Alternative identification**: Same as Get a subscription — `external_reference` can be used with `?identifier=external_reference`.
 
 ###### Example request
 

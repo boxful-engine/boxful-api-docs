@@ -142,8 +142,6 @@ curl -s https://<subdomain>.boxful.io/api/v1/base_plans/1 \
     "object": "Plan",
     "amount": 100.0,
     "currency": "ARS",
-    "main_discount_type": "none",
-    "main_discount_amount": null,
     "metadata": null,
     "per_unit_price": 0.0,
     "per_unit_price_description": null,
@@ -199,8 +197,8 @@ curl -s -X POST https://<subdomain>.boxful.io/api/v1/base_plans \
     "plans_attributes": [
       {
         "amount": 100.0,
-        "main_discount_type": "none",
-        "main_discount_amount": null,
+        "currency": "ARS",
+        "metadata": null,
         "start_at": "2020-06-31",
         "metadata": { "a_key": "a_value" }
       }
