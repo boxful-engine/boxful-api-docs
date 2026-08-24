@@ -175,6 +175,7 @@ Only `status` changes are supported. Accepted target values are `cancelled` and 
 | From | To | Conditions |
 |---|---|---|
 | `scheduled` | `cancelled` | - |
+| `pending` | `cancelled` | - |
 | `dunning` | `unpaid` | No pending payment resolution |
 | `dunning` | `cancelled` | Only when pending third-party collection |
 | `unpaid` | `cancelled` | - |

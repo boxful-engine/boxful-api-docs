@@ -5,6 +5,7 @@ A Payment belongs to an Invoice and represents a payment attempt. A Payment can 
 - [Fields](#fields)
 - [Endpoints](#endpoints)
   - [List all payments from a customer](#list-all-payments-from-a-customer)
+  - [List all payments from an invoice](#list-all-payments-from-an-invoice)
   - [Get a payment](#get-a-payment)
   - [Create a payment with invoice ID](#create-a-payment-with-invoice-id)
   - [Create a payment with external reference](#create-a-payment-with-external-reference)
@@ -64,6 +65,39 @@ curl -s https://<subdomain>.boxful.io/api/v1/customers/1/payments \
 }
 ```
 
+### List all payments from an invoice
+
+- `GET /api/v1/invoices/{invoice_id}/payments`
+
+Returns payment attempts for the specified invoice, ordered with the most recent first. Refund records are not included. Use numeric invoice IDs only — this endpoint does not support `?identifier=external_reference`.
+
+###### Example request
+
+```shell
+curl -s https://<subdomain>.boxful.io/api/v1/invoices/1/payments \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+###### Example response
+
+```json
+{
+  "data": [...],
+  "meta": {
+    "total": 3,
+    "per_page": 25,
+    "pages": 1
+  },
+  "links": {
+    "self": "https://<subdomain>.boxful.io/api/v1/invoices/1/payments?page=1",
+    "first": "https://<subdomain>.boxful.io/api/v1/invoices/1/payments?page=1",
+    "prev": null,
+    "next": null,
+    "last": "https://<subdomain>.boxful.io/api/v1/invoices/1/payments?page=1"
+  }
+}
+```
+
 ### Get a payment
 
 - `GET /api/v1/payments/{payment_id}`
@@ -103,7 +137,7 @@ This endpoint supports two modes of operation:
 
 1. **Trigger a payment attempt**: When called without a request body, initiates a manual payment attempt for invoices that are eligible for automatic processing.
 
-2. **Create an offline payment**: When called with a `payment` body, creates a manual payment record for payments received outside of the automated system (e.g., cash, bank transfers). Only available for invoices with status `scheduled` or `unpaid`.
+2. **Create an offline payment**: When called with a `payment` body, creates a manual payment record for payments received outside of the automated system (e.g., cash, bank transfers). Only available for invoices with status `scheduled`, `unpaid`, or `pending`.
 
 #### Offline payment fields
 
@@ -112,7 +146,6 @@ This endpoint supports two modes of operation:
 | `payment_type` | string | `true` | Valid values: `cash`, `cbu` |
 | `status` | string | `true` | Valid values: `approved`, `rejected` |
 | `date_created` | datetime | - | The date when the payment was received. Defaults to current time if not provided |
-| `comment` | string | - | Optional comment about the payment |
 
 ###### Example request (trigger payment attempt)
 
@@ -143,8 +176,7 @@ curl -s -X POST https://<subdomain>.boxful.io/api/v1/invoices/1/payments \
   -d '{
     "payment": {
       "payment_type": "cash",
-      "status": "approved",
-      "comment": "Payment received in person"
+      "status": "approved"
     }
   }'
 ```

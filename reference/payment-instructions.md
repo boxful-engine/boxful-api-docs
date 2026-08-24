@@ -1,6 +1,6 @@
 # Payment Instructions
 
-A PaymentInstruction groups the line items that will later be invoiced for a given customer. Once it is invoiced the related Invoice is embedded in the response.
+A PaymentInstruction groups the line items to be invoiced for a given customer. An invoice is created as soon as the payment instruction is created; because invoicing happens asynchronously, the `invoice` field is usually `null` in the create response and becomes populated shortly after. Fetch the payment instruction again to read the embedded Invoice.
 
 - [Embedded Resources](#embedded-resources)
 - [Fields](#fields)
@@ -28,8 +28,9 @@ A PaymentInstruction groups the line items that will later be invoiced for a giv
 | `id` | integer | `true` | Read | - |
 | `object` | string | - | Read | Always `PaymentInstruction` |
 | `amount` | float | `true` | Read | Sum of all non-deleted items amounts |
-| `collect_on` | date | - | Read | Optional target collection date |
+| `collect_on` | date | - | Write (create only) | Date on which Boxful attempts automatic collection (`YYYY-MM-DD`). When omitted or null, Boxful does not attempt automatic collection. Invalid or past dates are rejected. It seeds the invoice's due date at creation; thereafter the invoice's `next_attempt_date` drives collection and the payment instruction is immutable once invoiced. |
 | `created_at` | datetime | - | Read | - |
+| `invoice_due_date` | date | - | Write (only create) | Due date of the invoice created for this payment instruction. When omitted, the invoice is due on `collect_on`, or on the creation date if there is no `collect_on`. Must not be earlier than `collect_on`. |
 | `currency` | string | `true` | Read | ISO currency code taken from the account defaults |
 | `customer_id` | integer | `true` | Read | Internal customer identifier |
 | `customer_doc_number` | string | - | Read | Depends on customer profile |
@@ -76,7 +77,9 @@ curl -s https://<subdomain>.boxful.io/api/v1/payment_instructions/9822 \
 
 - `POST /api/v1/customers/{customer_id}/payment_instructions`
 
-Creates a payment instruction with at least one line item. The total amount is recalculated on the server from the submitted items. When linking a subscription, the `subscription_id` must belong to the same customer and the subscription must be in `authorized` or `in_trial` state.
+Creates a payment instruction with at least one line item, and an invoice for it. The total amount is recalculated on the server from the submitted items. When linking a subscription, the `subscription_id` must belong to the same customer and the subscription must be in `authorized` or `in_trial` state.
+
+Optionally set `collect_on` (`YYYY-MM-DD`) to schedule automatic collection. Set `invoice_due_date` to control when the resulting invoice is due. When omitted, the invoice is due on `collect_on`, or on the creation date if there is no `collect_on`.
 
 ###### Example request
 
@@ -88,6 +91,7 @@ curl -s -X POST https://<subdomain>.boxful.io/api/v1/customers/14038/payment_ins
     "payment_instruction": {
       "external_reference": "PI-00045",
       "subscription_id": 169,
+      "invoice_due_date": "2024-11-30",
       "items_attributes": [
         {
           "amount": 1500.0,
@@ -114,6 +118,7 @@ curl -s -X POST https://<subdomain>.boxful.io/api/v1/customers/14038/payment_ins
   "customer_email": "juan.perez@mail.com",
   "customer_external_reference": "a1b2c3d4",
   "external_reference": "PI-00045",
+  "invoice_due_date": "2024-11-30",
   "invoice": null,
   "items": [
     {
@@ -134,6 +139,12 @@ curl -s -X POST https://<subdomain>.boxful.io/api/v1/customers/14038/payment_ins
 ```json
 // 422 - Validation errors
 { "errors": { "items": ["can't be blank"] } }
+
+// 422 - collect_on in the past
+{ "errors": { "collect_on": ["no puede ser una fecha pasada"] } }
+
+// 422 - collect_on invalid format
+{ "errors": { "collect_on": ["debe ser una fecha válida"] } }
 
 // 422 - Subscription not found
 { "error": "subscription_not_found", "message": "Subscription not found or does not belong to this customer" }

@@ -47,7 +47,7 @@ curl -s -X POST https://<subdomain>.boxful.io/api/v1/customers \
 
 ## Step 2: Generate an embed token
 
-Use `POST /api/v1/embed/tokens` with a Bearer token from your Boxful account. The response includes a signed JWT (`token`), an `expires_at` timestamp, and an `iframe_type` echoing the request. **Tokens expire in 5 minutes.**
+Use `POST /api/v1/embed/tokens` with a Bearer token from your Boxful account. The response includes a signed JWT (`token`), an `expires_at` timestamp, and an `iframe_type` echoing the request. **Tokens expire in 30 minutes.** Mint the token as late as possible — the clock starts when you request it, not when the iframe loads, and there is no way to renew it. If it expires, the customer sees an `embed:error` and must restart checkout.
 
 Shared fields:
 

@@ -20,6 +20,7 @@ For more details refer to our [knowledge base](https://boxful.freshdesk.com/supp
 | `external_reference` | string | - | Read | - |
 | `coupon_id` | integer | - | Write (only update) | - |
 | `delivery_price_item_id` | integer | - | Write (only update) | - |
+| `payment_type` | string | - | Write (only update) | `credit_card`, `cbu` or `individual_payment`. Limited to the types the account has accepted. |
 | `plan_id` | integer | - | Write (only update) | - |
 | `checkout_data.prices` | object | - | Read | - |
 | `checkout_data.properties` | object | - | Read | - |
@@ -79,18 +80,30 @@ curl -s https://<subdomain>.boxful.io/api/v1/customers/123456/subscription_cart 
 
 - `PATCH /api/v1/customers/{customer_id}/subscription_cart`
 
+| Param | Type | Required | Notes |
+|---|---|---|---|
+| `payment_type` | string | no | How the subscription will be collected: `credit_card`, `cbu` or `individual_payment`. Only the types the account has accepted are allowed — same set the customer checkout offers. Sending a type the account has not accepted returns `422`. |
+
 ###### Example request
 
 ```shell
 curl -s -X PATCH https://<subdomain>.boxful.io/api/v1/customers/123456/subscription_cart \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{ "coupon_id": 1 }'
+  -d '{ "coupon_id": 1, "payment_type": "individual_payment" }'
 ```
 
 ###### Example response
 
 Returns the updated SubscriptionCart resource with recalculated `checkout_data.prices`.
+
+###### Error response
+
+```json
+{
+  "errors": ["payment_type is not accepted by this account"]
+}
+```
 
 ### Authorize a subscription cart
 
@@ -101,9 +114,49 @@ Returns the updated SubscriptionCart resource with recalculated `checkout_data.p
 
 > **Restricted**: This endpoint is not available to all accounts. Contact your Boxful representative for access.
 
+Authorizes the customer's pending cart and activates the subscription. The
+action takes no parameters — set the cart up first (including `payment_type`)
+with `PATCH /subscription_cart`, then authorize it.
+
+How the cart is authorized depends on its `payment_type`:
+
+| `payment_type` | Behavior |
+|---|---|
+| `credit_card` | The card set as the cart's default payment method is charged through the account's gateway. |
+| `individual_payment` | The subscription is authorized without charging: a **scheduled** first invoice is created awaiting offline collection, and no payment record is created. |
+
+Authorize only ever activates the customer's pending subscription. Once it has
+been authorized there is nothing left to authorize, so a repeated call returns
+the `invalid_state` body below rather than activating a second subscription.
+
 ###### Example request
 
 ```shell
 curl -s -X POST https://<subdomain>.boxful.io/api/v1/customers/123456/subscription_cart/authorize \
   -H "Authorization: Bearer $TOKEN"
+```
+
+###### Example response
+
+```json
+{
+  "status": 200,
+  "subscription": {
+    "object": "Subscription",
+    "status": "authorized",
+    "payment_type": "individual_payment"
+  }
+}
+```
+
+###### Error response
+
+Returned with HTTP `200` — inspect the in-body `status`.
+
+```json
+{
+  "status": 422,
+  "error": "invalid_state",
+  "message": "SubscriptionCart is not processable"
+}
 ```
