@@ -34,6 +34,7 @@ Subscriptions are created during the checkout process. Therefore, editable field
 | `payment_type` | string | `true` | Write (only update) | Valid values: `cbu`, `credit_card`, `individual_payment` |
 | `plan_id` | integer | `true` | Write (only update) | - |
 | `plan_quantity` | integer | - | Write (only update) | - |
+| `items` | array | - | Read | Present when `:multi_plan_subscriptions` is enabled for the account. Additive — top-level `plan_id` / `plan_quantity` / `delivery_price_item_id` stay. Omitted from nested customer embeds and webhook payloads. Each element: `id`, `object` (`SubscriptionItem`), `plan_id`, `plan_quantity`, `delivery_price_item_id`, `client_external_reference`. |
 | `status` | string | `true` | Write (only update) | Valid values: `authorized`, `in_trial`, `paused`, `cancelled`, `completed` |
 | `trial_end` | date | - | Read | Date of free-trial end |
 | `trial_start` | date | - | Read | Date of free-trial start |
@@ -91,6 +92,8 @@ curl -s https://<subdomain>.boxful.io/api/v1/subscriptions/1 \
 ```
 
 ###### Example response
+
+When `:multi_plan_subscriptions` is enabled for the account, the payload includes additive `items[]`. Accounts without the flag omit the key; top-level `plan_id` is unchanged in both cases.
 
 ```json
 {
@@ -166,6 +169,16 @@ curl -s https://<subdomain>.boxful.io/api/v1/subscriptions/1 \
   "payment_type": "credit_card",
   "plan_id": 1,
   "plan_quantity": 0,
+  "items": [
+    {
+      "id": 1,
+      "object": "SubscriptionItem",
+      "plan_id": 1,
+      "plan_quantity": 0.0,
+      "delivery_price_item_id": null,
+      "client_external_reference": null
+    }
+  ],
   "status": "authorized",
   "trial_end": null,
   "trial_start": null,
@@ -224,3 +237,22 @@ curl -s -X PATCH https://<subdomain>.boxful.io/api/v1/subscriptions/1 \
 ###### Example response
 
 Returns the updated Subscription resource with `cancelled_at` set and `status` changed to `cancelled`.
+
+To add a plan line, see [Create a subscription item](subscription-items.md#create-a-subscription-item). To change a plan line by item id, see [Update a subscription item](subscription-items.md#update-a-subscription-item). On a one-item subscription while the account is still in **single-item** write mode, nested `plan_id` / `plan_quantity` / `delivery_price_item_id` use this same cart-version write path. `client_external_reference` on the item is a row update and does not process a cart.
+
+To remove an item, see [Delete a subscription item](subscription-items.md#delete-a-subscription-item). Deleting the last item returns **422** and does not leave an itemless subscription.
+
+#### Multi-item write mode
+
+When Boxful enables **multi-item write mode** for your account (one-way), legacy parent/cart writes to `plan_id`, `delivery_price_item_id`, or non-metered `plan_quantity` return **409**:
+
+```json
+{
+  "errors": ["use /api/v1/subscriptions/:id/items"]
+}
+```
+
+- Default is **single-item** write mode: the fields above keep working on this endpoint.
+- **Metered** `plan_quantity` (consumption reporting) is still accepted on this endpoint. On subscriptions with **more than one item**, parent PATCH applies to the sole metered item when there is exactly one; when two or more metered items exist, parent PATCH returns **422** — use [Update a subscription item](subscription-items.md#update-a-subscription-item) with the target `item_id`.
+- Metadata, status, coupon, and other non-item fields continue to return **200**.
+- After the flip, plan-line changes on subscriptions with **more than one item** use [Subscription Items](subscription-items.md) when item-level invoicing exists (**409** until then). On a **one-item** subscription, parent PATCH with `plan_id` or `delivery_price_item_id` returns **409**; nested PATCH on `/items/:item_id` returns **200** and processes `current_version`. Metered `plan_quantity` and `client_external_reference` follow the same rules as before the flip on supported routes — see [Compatibility](subscription-items.md#compatibility).

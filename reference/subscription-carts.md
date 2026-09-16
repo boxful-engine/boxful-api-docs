@@ -97,11 +97,23 @@ curl -s -X PATCH https://<subdomain>.boxful.io/api/v1/customers/123456/subscript
 
 Returns the updated SubscriptionCart resource with recalculated `checkout_data.prices`.
 
+#### Multi-item write mode
+
+When the account is in **multi-item** API mode, legacy cart writes to `plan_id`, `delivery_price_item_id`, or non-metered `plan_quantity` return **409** with `"use /api/v1/subscriptions/:id/items"`. Default **single-item** mode keeps these fields working. **Metered** `plan_quantity` (consumption) is still accepted. See [Update a subscription](subscriptions.md#update-a-subscription) for the full contract.
+
 ###### Error response
 
 ```json
 {
   "errors": ["payment_type is not accepted by this account"]
+}
+```
+
+When multi-item API mode is enabled, legacy item-field writes return **409**:
+
+```json
+{
+  "errors": ["use /api/v1/subscriptions/:id/items"]
 }
 ```
 

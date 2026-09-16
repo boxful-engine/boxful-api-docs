@@ -79,6 +79,8 @@ Boxful API currently supports and sends the following events:
 | `occurred_at` | Timestamp of when the event occurred |
 | `content` | Key-value pair where the key is the object name and the value is the full resource. E.g., a `customer` key holds a Customer resource. Refer to each resource documentation for the complete payload. |
 
+**Multi-item subscriptions:** `subscription.*` webhook payloads omit `items[]` (same as nested customer embeds). After any subscription webhook, call [Get a subscription](subscriptions.md#get-a-subscription) to read item ids and plan lines — do not rely on top-level `plan_id` alone when a subscription has multiple items. See [Multi-Item Subscriptions](../how-to-guides/multi-item-subscriptions.md).
+
 ###### Example payload
 
 ```json

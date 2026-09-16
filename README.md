@@ -48,6 +48,7 @@ Collection endpoints return paginated results:
 
 - [Customers](reference/customers.md)
 - [Subscriptions](reference/subscriptions.md)
+- [Subscription Items](reference/subscription-items.md)
 - [Subscription Carts](reference/subscription-carts.md)
 - [Invoices](reference/invoices.md)
 - [Payments](reference/payments.md)
@@ -62,3 +63,4 @@ Collection endpoints return paginated results:
 ## How-To Guides
 
 - [Iframe Subscription Checkout](how-to-guides/iframe-subscription-checkout.md) — Embed Boxful's payment forms in your application via iframe
+- [Multi-Item Subscriptions](how-to-guides/multi-item-subscriptions.md) — Migrate from legacy `plan_id` writes to nested `/items` routes

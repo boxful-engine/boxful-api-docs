@@ -21,6 +21,7 @@ An InvoiceItem belongs to an Invoice. These are the individual items that make u
 | `object` | string | Read | Resource type |
 | `amount` | float | Read | - |
 | `base_amount` | float | Read | - |
+| `base_plan_id` | integer | Read | Present when `:multi_plan_subscriptions` is enabled for the account. On plan-backed lines (`item_type` = `Plan`) and on other lines when `subscription_cart_item_id` is set |
 | `category` | integer | Read | Valid values: `article`, `flat_fee`, `delivery_price`, `setup_fee`, `per_unit` |
 | `currency` | string | Read | - |
 | `description` | string | Read | - |
@@ -146,6 +147,7 @@ curl -s https://<subdomain>.boxful.io/api/v1/invoices/1 \
       "object": "InvoiceItem",
       "amount": 90.0,
       "base_amount": 100.0,
+      "base_plan_id": 1,
       "category": "flat_fee",
       "currency": "ARS",
       "description": "Default plan description",
