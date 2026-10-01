@@ -101,6 +101,8 @@ Returns the updated SubscriptionCart resource with recalculated `checkout_data.p
 
 When the account is in **multi-item** API mode, legacy cart writes to `plan_id`, `delivery_price_item_id`, or non-metered `plan_quantity` return **409** with `"use /api/v1/subscriptions/:id/items"`. Default **single-item** mode keeps these fields working. **Metered** `plan_quantity` (consumption) is still accepted. See [Update a subscription](subscriptions.md#update-a-subscription) for the full contract.
 
+For **`unselected`** checkout with multi-plan and multi-item write mode enabled, send an **`items`** array on this PATCH (same fields per line as [Create a customer — `subscription_items`](customers.md#create-a-customer-multi-plan-checkout-bootstrap-subscription_items)) to replace placeholder lines with N plan rows before authorize. You can combine `items` with `coupon_id` and `payment_type` in one request. Do not combine `items` with legacy `plan_id` or `base_plan_id`. Unknown or missing `plan_id` on a line returns **422** with `Plan is required`. Alternatively, bootstrap lines on customer create with `subscription_items`, or add lines on an activated subscription via nested `/items`.
+
 ###### Error response
 
 ```json

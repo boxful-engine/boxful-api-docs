@@ -16,6 +16,8 @@ The Boxful API uses API access tokens to authenticate requests. You can request 
 
 Please be sure to keep your API access tokens secure. Do not share your secret API access tokens in publicly accessible areas such as GitHub, client-side code, and so forth.
 
+If a token is exposed, ask your Boxful account representative to regenerate or revoke it. Either takes effect immediately: requests carrying the old token are rejected with `HTTP 401 Unauthorized`.
+
 All the requests must be authenticated via bearer. To do so use:
 
 ```

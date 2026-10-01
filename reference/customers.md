@@ -288,6 +288,50 @@ curl -s https://<subdomain>.boxful.io/api/v1/customers \
 }
 ```
 
+#### Multi-plan checkout bootstrap (`subscription_items`)
+
+When **multi-plan subscriptions** and **multi-item write mode** are both enabled, you can send `subscription_items` inside `customer` to create an **`unselected`** subscription, a **pending** cart, and one or more plan lines in a single request. Omit `subscription_items` to keep the legacy behavior (customer only, or optional `subscription_cart_attributes.base_plan_id` for a single-plan pending cart).
+
+| Condition | HTTP | `errors[]` |
+|-----------|------|------------|
+| `:multi_plan_subscriptions` off (`subscription_items` non-empty) | **403** | `Multi-plan subscriptions are not enabled for this account` |
+| Flipper on, `multi_item_mode` off (`subscription_items` non-empty) | **403** | `Multi-item write mode is not enabled for this account` |
+| `subscription_items: []` | **422** | `subscription_items cannot be empty` |
+| Unknown `coupon_id` in `subscription_cart_attributes` | **422** | `Could not find Coupon with id: …` |
+| Unknown `delivery_price_item_id` on a line | **422** | `Couldn't find DeliveryPriceItem with 'id'=…` |
+| `subscription_items` + legacy plan fields (`subscription_cart_attributes.base_plan_id`, root `plan_id`, or `base_plan_id`) | **422** | `subscription_items cannot be combined with legacy plan fields (plan_id, base_plan_id, or subscription_cart_attributes.base_plan_id); define plan lines in subscription_items only` |
+| `subscription_items` + `subscription_cart_attributes` with **only** `coupon_id` | **200** on success | — |
+
+Line fields match [Create a subscription item](subscription-items.md#create-a-subscription-item). The create is **transactional**: a failed line rolls back the customer and subscription. Item write failures reuse the same HTTP statuses as nested `/items` (for example **422** when `plan_id` is missing, **422** when sibling base plans are incompatible).
+
+After success, `subscription` in the response remains **`null`** until activation. Use the customer's [subscription cart](subscription-carts.md) to read checkout totals. For a full walkthrough see [Multi-Item Subscriptions](../how-to-guides/multi-item-subscriptions.md#step-6-bootstrap-checkout-lines-on-customer-create).
+
+###### Example request (two plan lines)
+
+```shell
+curl -s -X POST https://<subdomain>.boxful.io/api/v1/customers \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer": {
+      "fname": "Ada",
+      "lname": "Lovelace",
+      "email": "ada@example.com",
+      "birthdate": "1990-01-01",
+      "phone_country_code": "54",
+      "area_code": "11",
+      "phone": "12345678",
+      "doc_type": "DNI",
+      "doc_number": "12345678",
+      "external_reference": "order_98765",
+      "subscription_items": [
+        { "plan_id": 101, "plan_quantity": 0 },
+        { "plan_id": 202, "client_external_reference": "woo-line-2" }
+      ]
+    }
+  }'
+```
+
 ### Update a customer
 
 - `PATCH /api/v1/customers/{customer_id}`

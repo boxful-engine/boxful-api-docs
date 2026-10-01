@@ -253,6 +253,16 @@ When Boxful enables **multi-item write mode** for your account (one-way), legacy
 ```
 
 - Default is **single-item** write mode: the fields above keep working on this endpoint.
-- **Metered** `plan_quantity` (consumption reporting) is still accepted on this endpoint. On subscriptions with **more than one item**, parent PATCH applies to the sole metered item when there is exactly one; when two or more metered items exist, parent PATCH returns **422** — use [Update a subscription item](subscription-items.md#update-a-subscription-item) with the target `item_id`.
+- **Metered** `plan_quantity` (consumption reporting) is still accepted on this endpoint. On subscriptions with **more than one item**, parent PATCH applies to the sole metered item when there is exactly one (including preset siblings); when **two or more metered items** exist, parent PATCH returns **409**:
+
+```json
+{
+  "errors": [
+    "Plan quantity cannot be updated at the subscription level when multiple metered items exist; use /api/v1/subscriptions/:id/items"
+  ]
+}
+```
+
+Use [Update a subscription item](subscription-items.md#update-a-subscription-item) with the target metered item id instead.
 - Metadata, status, coupon, and other non-item fields continue to return **200**.
-- After the flip, plan-line changes on subscriptions with **more than one item** use [Subscription Items](subscription-items.md) when item-level invoicing exists (**409** until then). On a **one-item** subscription, parent PATCH with `plan_id` or `delivery_price_item_id` returns **409**; nested PATCH on `/items/:item_id` returns **200** and processes `current_version`. Metered `plan_quantity` and `client_external_reference` follow the same rules as before the flip on supported routes — see [Compatibility](subscription-items.md#compatibility).
+- After the flip, plan-line changes use nested [Subscription Items](subscription-items.md) on **one-item** and **multi-item** subscriptions alike: parent PATCH with `plan_id` or `delivery_price_item_id` returns **409**, while nested PATCH on `/items/:item_id` returns **200** and processes a new `current_version`. Metered `plan_quantity` and `client_external_reference` follow the same rules as before the flip on supported routes — see [Compatibility](subscription-items.md#compatibility).

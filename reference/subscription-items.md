@@ -8,7 +8,7 @@ On a **single-item** subscription, `plan_id`, `plan_quantity`, and `delivery_pri
 
 When Boxful enables **multi-item write mode** for your account, legacy parent/cart writes (`plan_id`, non-metered `plan_quantity`, `delivery_price_item_id`) on the subscription and cart endpoints return **409**. Use this nested route for plan-line changes on one-item subscriptions — including after the flip, when parent/cart PATCH with those billing fields still returns **409** but nested PATCH returns **200** and processes `current_version`.
 
-On a **multi-item subscription** (more than one item), `plan_id` and `delivery_price_item_id` return **409** until item-level invoicing exists. **`plan_quantity`** on a **metered** item is allowed — consumption is stored on that item row and propagated to the live invoiceable cart; preset siblings are unchanged. **`plan_quantity`** on a non-metered item returns **409**. `client_external_reference` can still be updated on any item.
+On a **multi-item subscription** (more than one item), `plan_id` and `delivery_price_item_id` update that item and process a new invoiceable cart (`current_version`), same as a single-item plan change. Sibling items are not mutated. Sibling-incompatible plans return **422**. **`plan_quantity`** on a **metered** item is allowed — consumption is stored on that item row and propagated to the live invoiceable cart; preset siblings are unchanged. **`plan_quantity`** on a non-metered item returns **409**. `client_external_reference` can still be updated on any item.
 
 - [Compatibility](#compatibility)
 - [Fields](#fields)
@@ -33,9 +33,9 @@ Two account settings work together:
 | `PATCH /subscriptions/:id` with `plan_id` / `delivery_price_item_id` / non-metered `plan_quantity` | Allowed | **409** — use nested `/items` |
 | `POST /subscriptions/:id/items` (first item on itemless sub) | **201** — parent legacy columns hydrated from the sole item; `current_version` moves | Same |
 | `POST /subscriptions/:id/items` (append 2nd item) | **409** — ask Boxful to enable multi-item write mode first | **201** — append only; second item not invoiced until item-level invoicing |
-| `PATCH /subscriptions/:id/items/:id` `plan_id` / `delivery_price_item_id` on N>1 sub | **409** | **409** until item-level invoicing |
+| `PATCH /subscriptions/:id/items/:id` `plan_id` / `delivery_price_item_id` on N>1 sub | **200** — processes `current_version` for that line | Same |
 | `PATCH /subscriptions/:id/items/:id` metered `plan_quantity` on N>1 sub | **200** on metered item only | Same — **409** on non-metered items |
-| `PATCH /subscriptions/:id` metered `plan_quantity` on N>1 sub | **200** when exactly one metered item; **422** when two or more | Same — use nested `/items/:id` to target a specific metered item |
+| `PATCH /subscriptions/:id` metered `plan_quantity` on N>1 sub | **200** when exactly one metered item; **409** when two or more (message directs to nested `/items`) | Same — use nested `/items/:id` to target a specific metered item |
 | `PATCH /subscriptions/:id/items/:id` `plan_id` / `delivery_price_item_id` on N=1 sub | **200** — processes `current_version` | **200** — same cart-version path as single-item write mode |
 | `PATCH /subscriptions/:id/items/:id` `client_external_reference` on N=1 sub | **200** | **200** |
 | `PATCH` / `POST` `client_external_reference` on N>1 sub | **200** | **200** |
@@ -51,9 +51,9 @@ Do not go live on multi-item billing with 2+ items until Boxful confirms item-le
 |---|---|---|---|---|
 | `id` | integer | `true` | Read | Stable item id |
 | `object` | string | - | Read | Always `SubscriptionItem` |
-| `plan_id` | integer | `true` on create | Read/Write | Must belong to the same account. Required on create. On update, single-item only; **409** when the subscription has more than one item |
+| `plan_id` | integer | `true` on create | Read/Write | Must belong to the same account. Required on create. On update, processes a new `current_version` (N=1 and N>1). Sibling-incompatible plans return **422** |
 | `plan_quantity` | float | - | Read/Write | Required to be ≥ 0 when the plan is per-unit. **Metered** consumption: on single-item subscriptions uses the same path as parent PATCH; on multi-item subscriptions allowed only when this item's plan is metered (writes the item row and live cart qty, not the parent column). **409** for non-metered items when the subscription has more than one item |
-| `delivery_price_item_id` | integer | - | Read/Write | Must belong to the same account. Same presence rules as parent PATCH (required when the plan is deliverable). Single-item only; **409** when the subscription has more than one item |
+| `delivery_price_item_id` | integer | - | Read/Write | Must belong to the same account. Same presence rules as parent PATCH (required when the plan is deliverable). On update, same `current_version` move as `plan_id` |
 | `client_external_reference` | string | - | Read/Write | Unique per account when present. Blank is stored as `null`. Allowed on single-item and multi-item subscriptions |
 
 ## Error responses
@@ -139,15 +139,13 @@ Returns **404** when the subscription is not in the account, or when `item_id` i
 
 Returns **403** when `multi_plan_subscriptions` is not enabled for the account.
 
-Returns **409** when `plan_id` or `delivery_price_item_id` is sent on a subscription that already has more than one item.
-
 Returns **409** when `plan_quantity` is sent on a **non-metered** item and the subscription has more than one item.
 
 On a **one-item** subscription after multi-item write mode is enabled, `plan_id` and `delivery_price_item_id` process a new invoiceable cart (`current_version`), same as in single-item write mode. Parent PATCH with those fields still returns **409** — use this nested route instead.
 
-On multi-item subscriptions, metered `plan_quantity` writes the item row and propagates to the pending cart and `current_version` cart lines for that item. The parent `plan_quantity` column stays nil. This does not process a new cart version for plan or delivery changes.
+On multi-item subscriptions, `plan_id` and `delivery_price_item_id` write the durable item row and process a new `current_version` cart (item identity stays stable). When the subscription already has a **scheduled** invoice, Boxful re-points that invoice to the new `current_version` (same behavior as [Delete a subscription item](#delete-a-subscription-item) when promotion leaves one item). Metered `plan_quantity` writes the item row and propagates to the pending cart and `current_version` cart lines for that item without processing a new version. The parent `plan_id` / `plan_quantity` columns stay nil.
 
-Returns **422** when the item cannot be saved (cancelled subscription, validation errors).
+Returns **422** when the item cannot be saved (cancelled subscription, sibling-incompatible plan, validation errors).
 
 ###### Example request (plan change)
 
